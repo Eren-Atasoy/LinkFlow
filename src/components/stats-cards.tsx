@@ -23,15 +23,8 @@ export function StatsCards() {
       bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
     },
     {
-      title: 'Gönderildi',
-      value: stats.sentCount,
-      icon: UserPlus,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-    },
-    {
       title: 'Bağlandı',
-      value: stats.connectedCount,
+      value: stats.acceptedCount,
       icon: UserCheck,
       color: 'text-green-600',
       bgColor: 'bg-green-100 dark:bg-green-900/30',

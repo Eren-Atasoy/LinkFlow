@@ -22,7 +22,7 @@ model LinkedInContact {
   profileImageUrl String? // Profil fotoğrafı
   location    String?  // Konum
   
-  // Status: PENDING, SENT, CONNECTED, REJECTED, WITHDRAWN
+  // Status: PENDING (Beklemede), ACCEPTED (Bağlandı), REJECTED (Reddedildi)
   status      String   @default("PENDING")
   
   extraNotes  String?  // Kullanıcı tarafından eklenebilen notlar
@@ -67,6 +67,8 @@ model BotConfig {
   lastResetDate         DateTime @default(now())
   searchKeywords        String   @default("CEO,CTO,CMO,CFO,COO,Director,Head of,Founder,Entrepreneur")
   linkedinSessionCookie String?  // LinkedIn oturum çerezi
+  maxConnectionsPerSearch Int    @default(3)    // Her aramada max bağlantı sayısı
+  maxPagesPerSearch     Int      @default(5)    // Her aramada max sayfa sayısı
   updatedAt             DateTime @updatedAt
 }
 

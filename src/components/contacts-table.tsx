@@ -30,12 +30,10 @@ interface ContactsTableProps {
   onRefresh: () => void
 }
 
-const statusVariants: Record<string, 'pending' | 'sent' | 'connected' | 'rejected' | 'secondary'> = {
+const statusVariants: Record<string, 'pending' | 'accepted' | 'rejected' | 'secondary'> = {
   PENDING: 'pending',
-  SENT: 'sent',
-  CONNECTED: 'connected',
+  ACCEPTED: 'accepted',
   REJECTED: 'rejected',
-  WITHDRAWN: 'secondary',
 }
 
 export function ContactsTable({ contacts, loading, onRefresh }: ContactsTableProps) {

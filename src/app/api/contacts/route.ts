@@ -12,8 +12,7 @@ export async function GET() {
     const stats = {
       totalContacts: contacts.length,
       pendingCount: contacts.filter((c) => c.status === 'PENDING').length,
-      sentCount: contacts.filter((c) => c.status === 'SENT').length,
-      connectedCount: contacts.filter((c) => c.status === 'CONNECTED').length,
+      acceptedCount: contacts.filter((c) => c.status === 'ACCEPTED').length,
       rejectedCount: contacts.filter((c) => c.status === 'REJECTED').length,
       todayCount: 0,
       dailyLimit: 25,

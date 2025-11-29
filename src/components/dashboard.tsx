@@ -17,7 +17,7 @@ export interface Contact {
   linkedinUrl: string
   profileImageUrl: string | null
   location: string | null
-  status: 'PENDING' | 'SENT' | 'CONNECTED' | 'REJECTED' | 'WITHDRAWN'
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   targetCategory: string
   extraNotes: string | null
   createdAt: string
@@ -51,8 +51,8 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchContacts()
-    // Her 5 saniyede bir güncelle (daha responsive)
-    const interval = setInterval(fetchContacts, 5000)
+    // Her 2 saniyede bir güncelle (anlık güncelleme için)
+    const interval = setInterval(fetchContacts, 2000)
     return () => clearInterval(interval)
   }, [])
 

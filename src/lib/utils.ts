@@ -26,10 +26,8 @@ export function getStatusColor(status: string): string {
   switch (status) {
     case 'PENDING':
       return 'status-pending'
-    case 'SENT':
-      return 'status-sent'
-    case 'CONNECTED':
-      return 'status-connected'
+    case 'ACCEPTED':
+      return 'status-accepted'
     case 'REJECTED':
       return 'status-rejected'
     default:
@@ -42,14 +40,10 @@ export function getStatusLabel(status: string): string {
   switch (status) {
     case 'PENDING':
       return 'Beklemede'
-    case 'SENT':
-      return 'Gönderildi'
-    case 'CONNECTED':
+    case 'ACCEPTED':
       return 'Bağlandı'
     case 'REJECTED':
       return 'Reddedildi'
-    case 'WITHDRAWN':
-      return 'Geri Çekildi'
     default:
       return status
   }

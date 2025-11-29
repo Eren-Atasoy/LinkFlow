@@ -11,10 +11,12 @@ import {
   Download, 
   Search,
   Loader2,
-  Settings
+  Settings,
+  CheckCircle2
 } from 'lucide-react'
 import { useBotStore } from '@/store/bot-store'
 import Link from 'next/link'
+import { BotSettings } from './bot-settings'
 
 interface BotControlsProps {
   onRefresh: () => void
@@ -66,6 +68,31 @@ export function BotControls({ onRefresh }: BotControlsProps) {
       }
     } catch (error) {
       addLog({ type: 'ERROR', message: 'Bot durdurulurken hata oluştu' })
+    }
+  }
+
+  const [isCheckingStatuses, setIsCheckingStatuses] = useState(false)
+
+  const handleCheckStatuses = async () => {
+    try {
+      setIsCheckingStatuses(true)
+      addLog({ type: 'INFO', message: 'LinkedIn profilleri kontrol ediliyor...' })
+      
+      const response = await fetch('/api/contacts/check-statuses', {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        addLog({ type: 'SUCCESS', message: `✅ ${result.updated} profil güncellendi` })
+        onRefresh() // Listeyi yenile
+      } else {
+        addLog({ type: 'ERROR', message: 'Profil kontrolü başarısız' })
+      }
+    } catch (error) {
+      addLog({ type: 'ERROR', message: 'Profil kontrolü hatası' })
+    } finally {
+      setIsCheckingStatuses(false)
     }
   }
 
@@ -141,6 +168,21 @@ export function BotControls({ onRefresh }: BotControlsProps) {
             <Button variant="outline" onClick={onRefresh}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Yenile
+            </Button>
+
+            <BotSettings />
+
+            <Button 
+              variant="outline" 
+              onClick={handleCheckStatuses}
+              disabled={isCheckingStatuses || isRunning}
+            >
+              {isCheckingStatuses ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              Status Kontrol
             </Button>
 
             <Button 

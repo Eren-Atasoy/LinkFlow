@@ -97,11 +97,32 @@ async function runLinkedInBot(sessionCookie: string, keywords: string[]) {
         data: { type: 'SUCCESS', message: 'Arama sayfası yüklendi' },
       })
 
-      let clickedCount = 0
-      const maxConnectionsPerSearch = 3
+      let totalClickedCount = 0
+      
+      // Config'den ayarları al (güvenli fallback) - currentConfig zaten yukarıda tanımlı
+      const maxConnectionsPerSearch = (currentConfig && 'maxConnectionsPerSearch' in currentConfig) 
+        ? (currentConfig.maxConnectionsPerSearch || 3)
+        : 3
+      const maxPagesPerSearch = (currentConfig && 'maxPagesPerSearch' in currentConfig)
+        ? (currentConfig.maxPagesPerSearch || 5)
+        : 5
+      
+      await prisma.botLog.create({
+        data: { type: 'INFO', message: `⚙️ Bot ayarları: ${maxConnectionsPerSearch} kişi/sayfa, ${maxPagesPerSearch} sayfa limiti` },
+      })
+      
+      let currentPage = 1
 
+      // Sayfalarda döngü - kullanıcının belirlediği limitlere göre
+      while (currentPage <= maxPagesPerSearch && totalClickedCount < maxConnectionsPerSearch) {
+        await prisma.botLog.create({
+          data: { type: 'INFO', message: `📄 Sayfa ${currentPage} kontrol ediliyor...` },
+        })
+
+        let pageClickedCount = 0
+        
       // Gerçek bilgileri alarak "Bağlantı kur" butonunu bul ve tıkla
-      for (let attempt = 0; attempt < 10 && clickedCount < maxConnectionsPerSearch; attempt++) {
+      for (let attempt = 0; attempt < 10 && pageClickedCount < maxConnectionsPerSearch; attempt++) {
         const currentConfig2 = await prisma.botConfig.findUnique({ where: { id: 'default' } })
         if (!currentConfig2?.isRunning) break
 
@@ -125,284 +146,291 @@ async function runLinkedInBot(sessionCookie: string, keywords: string[]) {
           
           let processed = false
           
-          // İlk görünür butonu bul ve işle (basit yaklaşım)
-          try {
-            const firstButton = connectLocator.first()
-            const isButtonVisible = await firstButton.isVisible().catch(() => false)
-            
-            if (!isButtonVisible) {
-              await prisma.botLog.create({
-                data: { type: 'INFO', message: `Buton görünür değil, sayfa kaydırılıyor...` },
-              })
-              await page.evaluate(() => window.scrollBy(0, 500))
-              await page.waitForTimeout(1000)
-              continue
-            }
-              
-            // Basit yaklaşım - önce butona tıkla, sonra bilgileri al
-            await firstButton.click({ force: true })
-            await page.waitForTimeout(2000)
-            
-            await prisma.botLog.create({
-              data: { type: 'INFO', message: `"Bağlantı Kur" butonuna tıklandı` },
-            })
-            
-            // Modal'da "Not olmadan gönderin"
-            let sendLocator = page.getByText('Not olmadan gönderin', { exact: true }).first()
-            let sendVisible = await sendLocator.isVisible().catch(() => false)
-            
-            if (!sendVisible) {
-              sendLocator = page.getByText('Send without a note', { exact: true }).first()
-              sendVisible = await sendLocator.isVisible().catch(() => false)
-            }
-            
-            if (!sendVisible) {
-              sendLocator = page.getByText('Gönder', { exact: true }).first()
-              sendVisible = await sendLocator.isVisible().catch(() => false)
-            }
-            
-            if (sendVisible) {
-              await sendLocator.click()
-              await page.waitForTimeout(1000)
-              
-              // Basit bilgilerle veritabanına kaydet
-              await prisma.linkedInContact.create({
-                data: {
-                  firstName: 'LinkedIn',
-                  lastName: `User #${clickedCount + 1}`,
-                  title: 'Professional',
-                  linkedinUrl: `https://www.linkedin.com/in/user-${Date.now()}`,
-                  targetCategory: 'CEO',
-                  status: 'SENT',
-                  connectionSentAt: new Date(),
-                },
-              })
-              
-              clickedCount++
-              todayCount++
-              
-              await prisma.botLog.create({
-                data: { type: 'SUCCESS', message: `🎉 Bağlantı gönderildi!` },
-              })
-              
-              processed = true
-            }
-            
-          } catch (btnErr) {
-            await prisma.botLog.create({
-              data: { type: 'WARNING', message: `Buton hatası: ${btnErr}` },
-            })
-          }
-          if (!processed) {
-            await page.evaluate(() => window.scrollBy(0, 500))
-            await page.waitForTimeout(1000)
-          } else {
-            // Başarılı işlem sonrası bekle
-            await page.waitForTimeout(Math.random() * 3000 + 2000)
-          }
-          
-        } catch (err) {
-          await prisma.botLog.create({
-            data: { type: 'WARNING', message: `Hata: ${err}` },
-          })
-          await page.waitForTimeout(2000)
-        }
-      }
+           // İlk görünür butonu bul ve işle
+           try {
+             const firstButton = connectLocator.first()
+             const isButtonVisible = await firstButton.isVisible().catch(() => false)
+             
+             if (!isButtonVisible) {
+               await prisma.botLog.create({
+                 data: { type: 'INFO', message: `Buton görünür değil, sayfa kaydırılıyor...` },
+               })
+               await page.evaluate(() => window.scrollBy(0, 500))
+               await page.waitForTimeout(1000)
+               continue
+             }
 
-      await prisma.botLog.create({
-        data: { type: 'INFO', message: `${clickedCount} kişiye bağlantı isteği gönderildi` },
-      })
-      
-      if (clickedCount > 0) {
-        await prisma.botConfig.update({
-          where: { id: 'default' },
-          data: { todayConnectionCount: todayCount },
-        })
-      }
-      
-      // Eğer 3 kişiye ulaştıysak VEYA hiç kişi bulamadıysak bir sonraki sayfaya geç
-      if (clickedCount >= maxConnectionsPerSearch || clickedCount === 0) {
-        try {
-          const logMessage = clickedCount === 0 
-            ? 'Bu sayfada bağlantı kurulacak kişi bulunamadı, sonraki sayfaya geçiliyor...' 
-            : `${maxConnectionsPerSearch} kişiye ulaşıldı, sonraki sayfaya geçiliyor...`
-          
-          await prisma.botLog.create({
-            data: { type: 'INFO', message: logMessage },
-          })
-          
-          const nextButton = page.getByRole('button', { name: /sonraki|next/i }).first()
-          const isNextVisible = await nextButton.isVisible().catch(() => false)
-          
-          if (isNextVisible) {
-            await nextButton.click()
-            await page.waitForTimeout(3000)
-            
-            await prisma.botLog.create({
-              data: { type: 'SUCCESS', message: '✅ Sonraki sayfaya geçildi, devam ediliyor...' },
-            })
-            
-            // Sonraki sayfada da 3 kişi daha ara
-            clickedCount = 0
-            for (let attempt2 = 0; attempt2 < 10 && clickedCount < maxConnectionsPerSearch; attempt2++) {
-              const currentConfig3 = await prisma.botConfig.findUnique({ where: { id: 'default' } })
-              if (!currentConfig3?.isRunning) break
+             // ÖNCELİKLE kişi bilgilerini çek (buton tıklanmadan önce)
+             let firstName = 'LinkedIn'
+             let lastName = 'User'
+             let title = 'Professional'
+             let company = ''
+             let linkedinUrl = ''
+             let location = ''
+
+             try {
+               // Butonun parent kartını bul ve bilgileri çek
+               const cardInfo = await firstButton.evaluate((btn) => {
+                 // Parent'a doğru çık, listitem bul
+                 let el: HTMLElement | null = btn as HTMLElement
+                 let card: HTMLElement | null = null
+                 
+                 for (let i = 0; i < 20; i++) {
+                   if (!el.parentElement) break
+                   el = el.parentElement
+                   if (el.getAttribute('role') === 'listitem') {
+                     card = el
+                     break
+                   }
+                 }
+                 
+                 if (!card) return null
+                 
+                 // İsim linki
+                 const nameLink = card.querySelector('a[data-view-name="search-result-lockup-title"]') as HTMLAnchorElement
+                 const name = nameLink?.textContent?.trim() || ''
+                 const url = nameLink?.href || ''
+                 
+                 // P tag'leri - title, location ve company
+                 const pTags = card.querySelectorAll('p')
+                 let titleText = ''
+                 let locationText = ''
+                 let companyText = ''
+                 
+                 pTags.forEach((p, idx) => {
+                   const text = p.textContent?.trim() || ''
+                   
+                   // Unvan (genelde 2. p tag)
+                   if (idx === 1 && text && !text.includes('•')) {
+                     titleText = text
+                   }
+                   
+                   // Lokasyon (genelde 3. p tag)
+                   if (idx === 2 && text && !text.includes('ortak') && !text.includes('Mevcut')) {
+                     locationText = text
+                   }
+                   
+                   // Şirket bilgisi ("Mevcut: X şirketinde" formatı)
+                   if (text.includes('Mevcut:')) {
+                     // "Mevcut: SolyTicket şirketinde Co-Founder & CTO" -> "SolyTicket"
+                     const match = text.match(/Mevcut:\s*(.+?)\s+şirketinde/)
+                     if (match && match[1]) {
+                       companyText = match[1].trim()
+                     }
+                   }
+                 })
+                 
+                 return { name, url, title: titleText, location: locationText, company: companyText }
+               })
+
+               if (cardInfo) {
+                 if (cardInfo.name) {
+                   const nameParts = cardInfo.name.split(' ')
+                   firstName = nameParts[0] || 'LinkedIn'
+                   lastName = nameParts.slice(1).join(' ') || 'User'
+                 }
+                 if (cardInfo.url) {
+                   linkedinUrl = cardInfo.url.split('?')[0]
+                 }
+                 if (cardInfo.title) {
+                   title = cardInfo.title
+                 }
+                 if (cardInfo.location) {
+                   location = cardInfo.location
+                 }
+                 if (cardInfo.company) {
+                   company = cardInfo.company
+                 }
+               }
+
+               await prisma.botLog.create({
+                 data: { type: 'INFO', message: `👤 Bulundu: ${firstName} ${lastName} - ${title}` },
+               })
+             } catch (infoErr) {
+               await prisma.botLog.create({
+                 data: { type: 'WARNING', message: `Kişi bilgisi alınamadı: ${infoErr}` },
+               })
+             }
+
+             // Daha önce eklenmiş mi kontrol et
+             if (linkedinUrl) {
+               const existing = await prisma.linkedInContact.findFirst({
+                 where: { linkedinUrl: { contains: linkedinUrl.split('/in/')[1]?.split('/')[0] || linkedinUrl } },
+               })
+               if (existing) {
+                 await prisma.botLog.create({
+                   data: { type: 'INFO', message: `⏭️ ${firstName} ${lastName} zaten kayıtlı, atlıyor...` },
+                 })
+                 // Bu butonu atla, scroll yap
+                 await page.evaluate(() => window.scrollBy(0, 200))
+                 await page.waitForTimeout(500)
+                 continue
+               }
+             }
               
-              try {
-                const profileCards2 = await page.$$('div[role="listitem"]')
-                
-                if (profileCards2.length === 0) {
-                  await page.evaluate(() => window.scrollBy(0, 500))
-                  await page.waitForTimeout(1000)
-                  continue
-                }
-                
-                let processed2 = false
-                
-                for (const card of profileCards2) {
-                  try {
-                    const connectButton = await card.$('a[href*="/preload/search-custom-invite/"]')
-                    if (!connectButton) continue
-                    
-                    const isVisible = await connectButton.isVisible().catch(() => false)
-                    if (!isVisible) continue
-                    
-                    let firstName = 'LinkedIn'
-                    let lastName = 'User'
-                    let title = 'Professional'
-                    let company = ''
-                    let linkedinUrl = ''
-                    
-                    const nameLink = await card.$('a[data-view-name="search-result-lockup-title"]')
-                    if (nameLink) {
-                      const fullName = await nameLink.textContent()
-                      const href = await nameLink.getAttribute('href')
-                      
-                      if (fullName && fullName.trim()) {
-                        const nameParts = fullName.trim().split(' ')
-                        firstName = nameParts[0] || 'LinkedIn'
-                        lastName = nameParts.slice(1).join(' ') || 'User'
-                      }
-                      
-                      if (href) {
-                        linkedinUrl = href.startsWith('http') ? href.split('?')[0] : `https://www.linkedin.com${href.split('?')[0]}`
-                      }
-                    }
-                    
-                    if (linkedinUrl) {
-                      const existing = await prisma.linkedInContact.findUnique({
-                        where: { linkedinUrl },
-                      })
-                      if (existing) continue
-                    }
-                    
-                    const allPTags = await card.$$('p')
-                    if (allPTags.length >= 2) {
-                      const titleText = await allPTags[1].textContent()
-                      if (titleText && titleText.trim() && !titleText.includes('•')) {
-                        title = titleText.trim()
-                      }
-                      
-                      // Şirket bilgisi
-                      for (const pTag of allPTags) {
-                        const text = await pTag.textContent()
-                        if (text && text.includes('Mevcut:')) {
-                          const companyMatch = text.match(/Mevcut:\s*(.+?)\s+şirketinde/)
-                          if (companyMatch && companyMatch[1]) {
-                            company = companyMatch[1].trim()
-                          }
-                          break
-                        }
-                      }
-                    }
-                    
-                    await connectButton.click({ force: true })
-                    await page.waitForTimeout(2000)
-                    
-                    let sendLocator = page.getByText('Not olmadan gönderin', { exact: true }).first()
-                    let sendVisible = await sendLocator.isVisible().catch(() => false)
-                    
-                    if (!sendVisible) {
-                      sendLocator = page.getByText('Send without a note', { exact: true }).first()
-                      sendVisible = await sendLocator.isVisible().catch(() => false)
-                    }
-                    
-                    if (!sendVisible) {
-                      sendLocator = page.getByText('Gönder', { exact: true }).first()
-                      sendVisible = await sendLocator.isVisible().catch(() => false)
-                    }
-                    
-                    if (sendVisible) {
-                      await sendLocator.click()
-                      await page.waitForTimeout(1000)
-                      
-                      let category = 'OTHER'
-                      const titleLower = title.toLowerCase()
-                      if (titleLower.includes('ceo')) category = 'CEO'
-                      else if (titleLower.includes('cto')) category = 'CTO'
-                      else if (titleLower.includes('cmo')) category = 'CMO'
-                      else if (titleLower.includes('director')) category = 'DIRECTOR'
-                      else if (titleLower.includes('manager')) category = 'MANAGER'
-                      
-                      await prisma.linkedInContact.create({
-                        data: {
-                          firstName,
-                          lastName,
-                          title,
-                          company: company || '',
-                          linkedinUrl: linkedinUrl || `https://www.linkedin.com/in/user-${Date.now()}`,
-                          targetCategory: category,
-                          status: 'SENT',
-                          connectionSentAt: new Date(),
-                        },
-                      })
-                      
-                      clickedCount++
-                      todayCount++
-                      
-                      await prisma.botLog.create({
-                        data: { type: 'SUCCESS', message: `🎉 2. sayfadan: ${firstName} ${lastName}` },
-                      })
-                      
-                      processed2 = true
-                      break
-                    }
-                  } catch (cardErr) {
-                    continue
-                  }
-                }
-                
-                if (!processed2) {
-                  await page.evaluate(() => window.scrollBy(0, 500))
-                  await page.waitForTimeout(1000)
-                } else {
-                  await page.waitForTimeout(Math.random() * 3000 + 2000)
-                }
-              } catch (err2) {
-                await page.waitForTimeout(2000)
-              }
-            }
-            
-            await prisma.botLog.create({
-              data: { type: 'SUCCESS', message: `2. sayfadan ${clickedCount} kişiye daha bağlantı gönderildi` },
-            })
-          }
-        } catch (pageErr) {
-          await prisma.botLog.create({
-            data: { type: 'WARNING', message: `Sayfa geçiş hatası: ${pageErr}` },
-          })
-        }
-      }
+             // Butona tıkla
+             await firstButton.click({ force: true })
+             await page.waitForTimeout(2000)
+             
+             await prisma.botLog.create({
+               data: { type: 'INFO', message: `"Bağlantı Kur" butonuna tıklandı` },
+             })
+             
+             // Modal'da "Not olmadan gönderin"
+             let sendLocator = page.getByText('Not olmadan gönderin', { exact: true }).first()
+             let sendVisible = await sendLocator.isVisible().catch(() => false)
+             
+             if (!sendVisible) {
+               sendLocator = page.getByText('Send without a note', { exact: true }).first()
+               sendVisible = await sendLocator.isVisible().catch(() => false)
+             }
+             
+             if (!sendVisible) {
+               sendLocator = page.getByText('Gönder', { exact: true }).first()
+               sendVisible = await sendLocator.isVisible().catch(() => false)
+             }
+             
+             if (sendVisible) {
+               await sendLocator.click()
+               await page.waitForTimeout(1000)
+
+               // Kategori belirle
+               let category = 'OTHER'
+               const titleLower = title.toLowerCase()
+               if (titleLower.includes('ceo') || titleLower.includes('genel müdür')) category = 'CEO'
+               else if (titleLower.includes('cto')) category = 'CTO'
+               else if (titleLower.includes('cmo')) category = 'CMO'
+               else if (titleLower.includes('cfo')) category = 'CFO'
+               else if (titleLower.includes('director') || titleLower.includes('direktör')) category = 'DIRECTOR'
+               else if (titleLower.includes('manager') || titleLower.includes('müdür')) category = 'MANAGER'
+               else if (titleLower.includes('founder') || titleLower.includes('kurucu')) category = 'ENTREPRENEUR'
+               else if (titleLower.includes('head')) category = 'HEAD_OF'
+               
+               // GERÇEK bilgilerle veritabanına kaydet
+               await prisma.linkedInContact.create({
+                 data: {
+                   firstName,
+                   lastName,
+                   title,
+                   company: company || null,
+                   location: location || null,
+                   linkedinUrl: linkedinUrl || `https://www.linkedin.com/in/user-${Date.now()}`,
+                   targetCategory: category,
+                   status: 'PENDING',
+                   connectionSentAt: new Date(),
+                 },
+               })
+               
+               pageClickedCount++
+               totalClickedCount++
+               todayCount++
+               
+               await prisma.botLog.create({
+                 data: { type: 'SUCCESS', message: `🎉 ${firstName} ${lastName}'a bağlantı gönderildi! (${totalClickedCount}/${maxConnectionsPerSearch})` },
+               })
+               
+               processed = true
+             }
+             
+           } catch (btnErr) {
+             await prisma.botLog.create({
+               data: { type: 'WARNING', message: `Buton hatası: ${btnErr}` },
+             })
+           }
+           if (!processed) {
+             await page.evaluate(() => window.scrollBy(0, 500))
+             await page.waitForTimeout(1000)
+           } else {
+             // Başarılı işlem sonrası bekle
+             await page.waitForTimeout(Math.random() * 3000 + 2000)
+           }
+           
+         } catch (err) {
+           await prisma.botLog.create({
+             data: { type: 'WARNING', message: `Hata: ${err}` },
+           })
+           await page.waitForTimeout(2000)
+         }
+       }
+
+       await prisma.botLog.create({
+         data: { type: 'INFO', message: `Sayfa ${currentPage}: ${pageClickedCount} kişiye bağlantı isteği gönderildi` },
+       })
+       
+       if (totalClickedCount > 0) {
+         await prisma.botConfig.update({
+           where: { id: 'default' },
+           data: { todayConnectionCount: todayCount },
+         })
+       }
+       
+       // 3 kişiye ulaştıysak dur
+       if (totalClickedCount >= maxConnectionsPerSearch) {
+         await prisma.botLog.create({
+           data: { type: 'SUCCESS', message: `🎯 Hedef sayıya ulaşıldı! ${totalClickedCount} kişiye bağlantı gönderildi` },
+         })
+         break // While loop'tan çık
+       }
+       
+       // Bu sayfada kişi bulunduysa ama 3'e ulaşmadıysak, aynı sayfada devam et
+       // (for loop zaten 10 deneme yapıyor, bu sayfada başka kişi var mı kontrol ediyor)
+       
+       // Eğer bu sayfada hiç kişi bulamadıysak VEYA tüm kişileri işlediyse, sonraki sayfaya geç
+       if (pageClickedCount === 0 || (pageClickedCount > 0 && totalClickedCount < maxConnectionsPerSearch)) {
+         // Sonraki sayfaya geç
+         if (currentPage < maxPagesPerSearch) {
+           try {
+             const logMsg = pageClickedCount === 0 
+               ? `⚠️ Bu sayfada bağlantı kurulacak kişi bulunamadı. Sayfa ${currentPage + 1}'e geçiliyor...`
+               : `📄 Bu sayfada ${pageClickedCount} kişi bulundu (toplam: ${totalClickedCount}/${maxConnectionsPerSearch}). Sayfa ${currentPage + 1}'e geçiliyor...`
+             
+             await prisma.botLog.create({
+               data: { type: 'INFO', message: logMsg },
+             })
+             
+             const nextButton = page.getByRole('button', { name: /sonraki|next/i }).first()
+             const isNextVisible = await nextButton.isVisible().catch(() => false)
+             
+             if (isNextVisible) {
+               await nextButton.click()
+               await page.waitForTimeout(3000)
+               
+               currentPage++
+               
+               await prisma.botLog.create({
+                 data: { type: 'SUCCESS', message: `✅ Sayfa ${currentPage}'e geçildi, devam ediliyor...` },
+               })
+             } else {
+               await prisma.botLog.create({
+                 data: { type: 'WARNING', message: '⚠️ Sonraki sayfa butonu bulunamadı, arama tamamlandı' },
+               })
+               break // While loop'tan çık
+             }
+           } catch (pageErr) {
+             await prisma.botLog.create({
+               data: { type: 'WARNING', message: `Sayfa geçiş hatası: ${pageErr}` },
+             })
+             break // While loop'tan çık
+           }
+         } else {
+           await prisma.botLog.create({
+             data: { type: 'INFO', message: `📋 Maksimum sayfa sayısına ulaşıldı (${maxPagesPerSearch} sayfa)` },
+           })
+           break
+         }
+       }
+      } // while loop sonu
     }
 
     await prisma.botLog.create({
       data: { type: 'SUCCESS', message: 'Bot işlemi tamamlandı' },
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[BOT] Hata:', error)
+    const errorMessage = error?.message || String(error)
     await prisma.botLog.create({
-      data: { type: 'ERROR', message: `Bot hatası: ${error}` },
+      data: { type: 'ERROR', message: `Bot hatası: ${errorMessage}` },
     })
   } finally {
     await prisma.botConfig.update({

@@ -102,13 +102,13 @@ export async function GET() {
             fgColor: { argb: 'FFC7CE' },
           }
           statusCell.font = { color: { argb: '9C0006' } }
-        } else if (status === 'SENT') {
+        } else if (status === 'ACCEPTED') {
           statusCell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'BDD7EE' },
+            fgColor: { argb: 'C6EFCE' },
           }
-          statusCell.font = { color: { argb: '1F4E78' } }
+          statusCell.font = { color: { argb: '006100' } }
         } else if (status === 'PENDING') {
           statusCell.fill = {
             type: 'pattern',

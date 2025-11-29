@@ -16,7 +16,7 @@ import { PrismaClient } from '@prisma/client'
 
 // Type tanımları
 type TargetCategory = 'CEO' | 'CTO' | 'CMO' | 'CFO' | 'COO' | 'CHRO' | 'OTHER_CLEVEL' | 'HEAD_OF' | 'DIRECTOR' | 'MENTOR' | 'ENTREPRENEUR' | 'ACADEMIC' | 'OTHER'
-type ConnectionStatus = 'PENDING' | 'SENT' | 'CONNECTED' | 'REJECTED' | 'WITHDRAWN'
+type ConnectionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
 // Utils fonksiyonları
 function getRandomDelay(minSeconds: number, maxSeconds: number): number {
   return Math.floor(Math.random() * (maxSeconds - minSeconds + 1) + minSeconds) * 1000
@@ -340,7 +340,7 @@ class LinkedInBot {
         await prisma.linkedInContact.update({
           where: { linkedinUrl: profileData.linkedinUrl },
           data: {
-            status: 'SENT',
+            status: 'PENDING',
             connectionSentAt: new Date(),
           },
         })

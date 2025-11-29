@@ -10,8 +10,7 @@ export interface BotLog {
 export interface BotStats {
   totalContacts: number
   pendingCount: number
-  sentCount: number
-  connectedCount: number
+  acceptedCount: number
   rejectedCount: number
   todayCount: number
   dailyLimit: number
@@ -34,8 +33,7 @@ export const useBotStore = create<BotState>((set) => ({
   stats: {
     totalContacts: 0,
     pendingCount: 0,
-    sentCount: 0,
-    connectedCount: 0,
+    acceptedCount: 0,
     rejectedCount: 0,
     todayCount: 0,
     dailyLimit: 25,

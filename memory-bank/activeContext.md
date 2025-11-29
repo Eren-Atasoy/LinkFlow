@@ -75,17 +75,71 @@ src/bot/linkedin-bot.ts - Ana bot mantığı (simülasyon kaldırıldı)
 4. ✅ Modal kapatılamıyor - "Not olmadan gönderin" butonu bulundu
 5. ✅ Nested span elementi - force: true ile tıklama
 
+## Son Büyük Güncellemeler (29 Kasım 2025)
+
+### 1. Status Sistemi Yenilendi ✅
+
+**Değişiklikler:**
+- ❌ "SENT" (Gönderildi) durumu tamamen kaldırıldı
+- ✅ Yeni durum sistemi: **PENDING, ACCEPTED, REJECTED**
+- ✅ Frontend kartları güncellendi (Beklemede, Bağlandı, Reddedildi)
+- ✅ Bot artık tüm bağlantıları "PENDING" olarak kaydediyor
+- ✅ Badge renkleri güncellendi:
+  - 🟡 PENDING: Sarı (Beklemede)
+  - 🟢 ACCEPTED: Yeşil (Bağlandı)
+  - 🔴 REJECTED: Kırmızı (Reddedildi)
+
+### 2. Yeni "Status Kontrol" Özelliği ✅
+
+**Nasıl Çalışır:**
+- Yeni "Status Kontrol" butonu eklendi
+- LinkedIn profillerini otomatik kontrol eder:
+  1. "Beklemede" yazısı varsa → Hala **PENDING**
+  2. "Mesaj gönder" butonu varsa → **ACCEPTED** (bağlantı kabul edilmiş)
+  3. "Bağlantı kur" butonu varsa → **REJECTED** (reddedilmiş)
+- API Endpoint: `/api/contacts/check-statuses`
+- Playwright ile otomatik LinkedIn tarama
+- Her profil arasında 2-5 saniye rastgele bekleme
+
+### 3. Yenile Butonu Dokümantasyonu ✅
+
+**"Yenile" Butonu İşlevi:**
+1. `/api/contacts` API'den tüm kişileri çeker
+2. İstatistikleri günceller (Toplam, Beklemede, Bağlandı, Reddedildi)
+3. Bot durumunu kontrol eder (çalışıyor/durdu)
+
+## Dosya Değişiklikleri
+
+```
+✅ prisma/schema.prisma - Status enum güncellendi
+✅ src/app/api/bot/start/route.ts - PENDING kullanımı
+✅ src/app/api/contacts/route.ts - acceptedCount eklendi
+✅ src/app/api/contacts/check-statuses/route.ts - YENİ
+✅ src/app/api/export/excel/route.ts - ACCEPTED rengi
+✅ src/bot/linkedin-bot.ts - Status type güncellendi
+✅ src/components/bot-controls.tsx - Status Kontrol butonu
+✅ src/components/contacts-table.tsx - Badge variants
+✅ src/components/dashboard.tsx - Status type
+✅ src/components/stats-cards.tsx - Kartlar güncellendi
+✅ src/components/ui/badge.tsx - Variants güncellendi
+✅ src/lib/utils.ts - getStatusLabel güncellendi
+✅ src/app/globals.css - CSS sınıfları
+✅ src/store/bot-store.ts - BotStats interface
+```
+
 ## Sonraki Adımlar
 
 1. ✅ Fake data kaldırıldı
 2. ✅ Gerçek LinkedIn cookie ile test (manuel giriş)
 3. ✅ "Bağlantı Kur" butonlarına tıklama
 4. ✅ Modal işleme ("Not olmadan gönderin")
-5. [ ] Kişi bilgilerini veritabanına kaydetme
-6. [ ] Delay süreleri ayarlama (şu an 10-30 saniye, gerçekte 2-5 dakika olmalı)
-7. [ ] Günlük limit kontrolü
-8. [ ] Memory bank güncelleme
+5. ✅ Status sistemi yenilendi (PENDING/ACCEPTED/REJECTED)
+6. ✅ Status kontrolü otomasyonu eklendi
+7. ✅ Yenile butonu dokümantasyonu
+8. ✅ Memory bank güncellendi
+9. [ ] Pagination - sonraki sayfaya geçiş (kısmen çalışıyor)
+10. [ ] Profil bilgilerini daha doğru çekme
 
 ---
 
-Son Güncelleme: 28 Kasım 2025, 00:34
+Son Güncelleme: 29 Kasım 2025, 19:05
