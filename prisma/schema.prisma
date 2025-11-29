@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// LinkedIn kişi modeli
+model LinkedInContact {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  title       String   // Meslek/Ünvan
+  company     String?  // Çalıştığı Kurum
+  education   String?  // Mezun Olduğu Bölüm/Okul
+  linkedinUrl String   @unique // LinkedIn Profil URL'i
+  profileImageUrl String? // Profil fotoğrafı
+  location    String?  // Konum
+  
+  // Status: PENDING, SENT, CONNECTED, REJECTED, WITHDRAWN
+  status      String   @default("PENDING")
+  
+  extraNotes  String?  // Kullanıcı tarafından eklenebilen notlar
+  
+  // Hedef kitle kategorisi: CEO, CTO, CMO, CFO, COO, CHRO, OTHER_CLEVEL, HEAD_OF, DIRECTOR, MENTOR, ENTREPRENEUR, ACADEMIC, OTHER
+  targetCategory String @default("OTHER")
+  
+  // Zaman damgaları
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Bağlantı isteği gönderilme tarihi
+  connectionSentAt DateTime?
+  
+  // İndeksler
+  @@index([status])
+  @@index([targetCategory])
+  @@index([createdAt])
+}
+
+// Bot çalışma logları
+model BotLog {
+  id        String   @id @default(cuid())
+  // type: INFO, SUCCESS, WARNING, ERROR, ACTION
+  type      String
+  message   String
+  details   String?  // JSON formatında detaylar
+  createdAt DateTime @default(now())
+  
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Bot yapılandırması
+model BotConfig {
+  id                    String   @id @default("default")
+  isRunning             Boolean  @default(false)
+  dailyLimit            Int      @default(25)
+  minDelaySeconds       Int      @default(120)  // 2 dakika
+  maxDelaySeconds       Int      @default(300)  // 5 dakika
+  todayConnectionCount  Int      @default(0)
+  lastResetDate         DateTime @default(now())
+  searchKeywords        String   @default("CEO,CTO,CMO,CFO,COO,Director,Head of,Founder,Entrepreneur")
+  linkedinSessionCookie String?  // LinkedIn oturum çerezi
+  updatedAt             DateTime @updatedAt
+}
+
+// Arama oturumları
+model SearchSession {
+  id            String   @id @default(cuid())
+  keyword       String
+  resultsFound  Int      @default(0)
+  profilesScraped Int    @default(0)
+  connectionsSent Int    @default(0)
+  // status: ACTIVE, PAUSED, COMPLETED, FAILED
+  status        String   @default("ACTIVE")
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  
+  @@index([status])
+  @@index([startedAt])
+}
