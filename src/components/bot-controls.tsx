@@ -15,8 +15,6 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { useBotStore } from '@/store/bot-store'
-import Link from 'next/link'
-import { BotSettings } from './bot-settings'
 
 interface BotControlsProps {
   onRefresh: () => void
@@ -27,7 +25,6 @@ export function BotControls({ onRefresh }: BotControlsProps) {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [isExporting, setIsExporting] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
-  const [showCookieWarning, setShowCookieWarning] = useState(false)
 
   const handleStartBot = async () => {
     if (isRunning) return
@@ -42,15 +39,13 @@ export function BotControls({ onRefresh }: BotControlsProps) {
       
       if (response.ok) {
         setIsRunning(true)
-        addLog({ type: 'SUCCESS', message: 'Bot başlatıldı' })
+        const keywordMsg = searchKeyword 
+          ? `"${searchKeyword}" anahtar kelimesi ile bot başlatıldı`
+          : 'Bot başlatıldı (ayarlardan yapılandırılan anahtar kelimeler kullanılıyor)'
+        addLog({ type: 'SUCCESS', message: keywordMsg })
       } else {
         const data = await response.json()
-        addLog({ type: 'ERROR', message: data.error || 'Bot başlatılamadı' })
-        
-        // Cookie hatası için özel uyarı
-        if (data.error?.includes('oturum çerezi')) {
-          setShowCookieWarning(true)
-        }
+        addLog({ type: 'ERROR', message: data.message || data.error || 'Bot başlatılamadı' })
       }
     } catch (error) {
       addLog({ type: 'ERROR', message: 'Bot başlatılırken hata oluştu' })
@@ -170,8 +165,6 @@ export function BotControls({ onRefresh }: BotControlsProps) {
               Yenile
             </Button>
 
-            <BotSettings />
-
             <Button 
               variant="outline" 
               onClick={handleCheckStatuses}
@@ -210,33 +203,6 @@ export function BotControls({ onRefresh }: BotControlsProps) {
             </div>
           )}
 
-          {showCookieWarning && (
-            <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Settings className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    LinkedIn oturum çerezi ayarlanmamış
-                  </p>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    Bot'u kullanabilmek için önce LinkedIn session cookie'nizi ayarlamanız gerekiyor.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-3"
-                    asChild
-                    onClick={() => setShowCookieWarning(false)}
-                  >
-                    <Link href="/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Ayarlara Git
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

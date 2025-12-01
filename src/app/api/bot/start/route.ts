@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { chromium } from 'playwright'
 
-async function runLinkedInBot(sessionCookie: string, keywords: string[]) {
+async function runLinkedInBot(keywords: string[]) {
   console.log('[BOT] LinkedIn bot başlatılıyor...')
   
   let browser = null
@@ -40,18 +40,7 @@ async function runLinkedInBot(sessionCookie: string, keywords: string[]) {
 
     await page.goto('https://www.linkedin.com/login', { waitUntil: 'domcontentloaded', timeout: 60000 })
     
-    if (sessionCookie && sessionCookie.length > 10) {
-      await context.addCookies([{
-        name: 'li_at',
-        value: sessionCookie,
-        domain: '.linkedin.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'None'
-      }])
-    }
-    
+    // Manuel giriş için direkt feed'e git
     await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded', timeout: 60000 })
     await page.waitForTimeout(3000)
     
@@ -449,7 +438,7 @@ async function runLinkedInBot(sessionCookie: string, keywords: string[]) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { keyword, sessionCookie } = body
+    const { keyword } = body
 
     const config = await prisma.botConfig.findUnique({
       where: { id: 'default' },
@@ -464,9 +453,17 @@ export async function POST(request: Request) {
 
     let keywords: string[] = []
     if (keyword && keyword.trim()) {
+      // Kullanıcının girdiği anahtar kelimeyi kullan
       keywords = [keyword.trim()]
+    } else if (config?.searchKeywords && config.searchKeywords.trim()) {
+      // Config'deki anahtar kelimeleri kullan (virgülle ayrılmış)
+      keywords = config.searchKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0)
     } else {
-      keywords = ['CEO']
+      // Fallback: Eğer hiçbir şey yoksa hata ver
+      return NextResponse.json(
+        { success: false, message: 'Lütfen bir arama anahtar kelimesi girin veya ayarlardan anahtar kelimeleri yapılandırın' },
+        { status: 400 }
+      )
     }
 
     await prisma.botConfig.update({
@@ -474,7 +471,7 @@ export async function POST(request: Request) {
       data: { isRunning: true },
     })
 
-    runLinkedInBot(sessionCookie || '', keywords).catch((err) => {
+    runLinkedInBot(keywords).catch((err) => {
       console.error('Bot çalıştırma hatası:', err)
     })
 

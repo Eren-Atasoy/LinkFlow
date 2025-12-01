@@ -8,12 +8,10 @@ import { Input } from '@/components/ui/input'
 import { 
   Save, 
   Loader2, 
-  Key, 
   Clock, 
   Target, 
   AlertTriangle,
   CheckCircle,
-  Info,
   ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
@@ -26,7 +24,8 @@ interface BotConfig {
   maxDelaySeconds: number
   todayConnectionCount: number
   searchKeywords: string
-  linkedinSessionCookie: string | null
+  maxConnectionsPerSearch: number
+  maxPagesPerSearch: number
 }
 
 export default function SettingsPage() {
@@ -36,11 +35,12 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Form state
-  const [sessionCookie, setSessionCookie] = useState('')
   const [dailyLimit, setDailyLimit] = useState(25)
   const [minDelay, setMinDelay] = useState(120)
   const [maxDelay, setMaxDelay] = useState(300)
   const [keywords, setKeywords] = useState('')
+  const [maxConnectionsPerSearch, setMaxConnectionsPerSearch] = useState(3)
+  const [maxPagesPerSearch, setMaxPagesPerSearch] = useState(5)
 
   useEffect(() => {
     fetchConfig()
@@ -52,11 +52,12 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json()
         setConfig(data)
-        setSessionCookie(data.linkedinSessionCookie || '')
         setDailyLimit(data.dailyLimit)
         setMinDelay(data.minDelaySeconds)
         setMaxDelay(data.maxDelaySeconds)
         setKeywords(data.searchKeywords)
+        setMaxConnectionsPerSearch(data.maxConnectionsPerSearch || 3)
+        setMaxPagesPerSearch(data.maxPagesPerSearch || 5)
       }
     } catch (error) {
       console.error('Config yüklenirken hata:', error)
@@ -71,14 +72,15 @@ export default function SettingsPage() {
 
     try {
       const response = await fetch('/api/bot/config', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          linkedinSessionCookie: sessionCookie || null,
           dailyLimit,
           minDelaySeconds: minDelay,
           maxDelaySeconds: maxDelay,
           searchKeywords: keywords,
+          maxConnectionsPerSearch,
+          maxPagesPerSearch,
         }),
       })
 
@@ -136,55 +138,51 @@ export default function SettingsPage() {
         )}
 
         <div className="grid gap-6">
-          {/* LinkedIn Session Cookie */}
+          {/* Bot Ayarları */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-linkedin" />
-                LinkedIn Oturum Çerezi
+                <Target className="h-5 w-5 text-purple-500" />
+                Bot Çalışma Ayarları
               </CardTitle>
               <CardDescription>
-                LinkedIn'e giriş yapmak için gerekli olan li_at çerezini buraya girin
+                Bot'un her aramada kaç kişi bulacağını ve kaç sayfa tarayacağını ayarlayın
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                type="password"
-                placeholder="AQEDAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                value={sessionCookie}
-                onChange={(e) => setSessionCookie(e.target.value)}
-                className="font-mono"
-              />
-              
-              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-foreground mb-2">Cookie nasıl alınır:</p>
-                    <ol className="list-decimal list-inside space-y-1">
-                      <li>LinkedIn'e giriş yapın (linkedin.com)</li>
-                      <li>F12 tuşuna basarak DevTools'u açın</li>
-                      <li>Application (Uygulama) sekmesine gidin</li>
-                      <li>Sol menüden Cookies → linkedin.com seçin</li>
-                      <li><code className="bg-background px-1 rounded">li_at</code> değerini bulun ve kopyalayın</li>
-                    </ol>
-                  </div>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Her Aramada Max Bağlantı Sayısı
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={maxConnectionsPerSearch}
+                    onChange={(e) => setMaxConnectionsPerSearch(parseInt(e.target.value) || 3)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Her arama anahtar kelimesi için gönderilecek maksimum bağlantı sayısı
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Her Aramada Max Sayfa Sayısı
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={maxPagesPerSearch}
+                    onChange={(e) => setMaxPagesPerSearch(parseInt(e.target.value) || 5)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Her arama için taranacak maksimum sayfa sayısı (her sayfada ~10 kişi)
+                  </p>
                 </div>
               </div>
-
-              {!sessionCookie && (
-                <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 text-sm">
-                  <AlertTriangle className="h-4 w-4" />
-                  Oturum çerezi ayarlanmamış. Bot çalışmayacaktır.
-                </div>
-              )}
-
-              {sessionCookie && (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  Oturum çerezi ayarlanmış
-                </div>
-              )}
             </CardContent>
           </Card>
 
